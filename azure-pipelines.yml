@@ -40,4 +40,4 @@ steps:
   displayName: 'Publishing to Aritifact'
   inputs:
     pathtoPublish: '$(Build.ArtifactStagingDirectory)'
-    artifactName: 'API'
+    artifactName: 'ConsoleApp'
