@@ -7,13 +7,10 @@
 trigger:
 - master
 - develop
-
 pool:
-  vmImage: 'windows-latest'
+  vmImage: ubuntu-latest
 
 variables:
-  solution: '**/*.sln'
-  buildPlatform: 'Any CPU'
   buildConfiguration: 'Release'
 
 steps:
@@ -31,14 +28,13 @@ steps:
 - task: DotNetCoreCLI@2
   displayName: 'Publishing'
   inputs:
-    command: publish 
-    arguments: -r win-x64 -p:PublishSingleFile=True --self-contained false -o $(Build.ArtifactStagingDirectory)
-    projects: '**/*.csproj'
-    publishWebProjects: false
-  enabled: true
+    command: publish
+    publishWebProjects: true
+    arguments: '--configuration $(BuildConfiguration) --output $(Build.ArtifactStagingDirectory)'
+    zipAfterPublish: true
 
 - task: PublishBuildArtifacts@1
   displayName: 'Publishing to Aritifact'
   inputs:
     pathtoPublish: '$(Build.ArtifactStagingDirectory)'
-    artifactName: 'ConsoleApp'
+    artifactName: 'API'
