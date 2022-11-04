@@ -6,8 +6,6 @@
 trigger:
 - master
 - develop
-
-
 pool:
   vmImage: ubuntu-latest
 
@@ -16,7 +14,7 @@ variables:
 
 steps:
 - script: dotnet build --configuration $(buildConfiguration)
-  displayName: 'dotnet build $(buildConfiguration)'
+  displayName: 'Build Release'
 
 - task: DotNetCoreCLI@2
   displayName: 'Running Tests'
@@ -26,16 +24,9 @@ steps:
     arguments: '--configuration $(buildConfiguration)'
     
 
-- task: DotNetCoreCLI@2
-  displayName: 'Publishing'
-  inputs:
-    command: publish
-    publishWebProjects: true
-    arguments: '--configuration $(BuildConfiguration) --output $(Build.ArtifactStagingDirectory)'
-    zipAfterPublish: true
 
 - task: PublishBuildArtifacts@1
-  displayName: 'Publishing to Aritifact'
+  displayName: 'Publishing to Console'
   inputs:
     pathtoPublish: '$(Build.ArtifactStagingDirectory)'
     artifactName: 'ConsoleApp'
