@@ -1,158 +1,37 @@
-﻿
-namespace ElevatorConsoleApp
+﻿using System.Net.Http.Headers;
+using ElevatorConsoleApp.Services;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
+
+namespace ElevatorConsoleApp;
+
+public static class Program
 {
-    public class Program
+    public static void Main(string[] args)
     {
-        private const string QUIT = "q";
-
-        public static void Main(string[] args)
-        {
-
-        Start:
-            Console.WriteLine("Welcome");
-            Console.WriteLine("How many floors does this elevator will be needed?");
-
-            int floor; string floorInput; Elevator elevator;
-
-            floorInput = Console.ReadLine();
-
-            if (Int32.TryParse(floorInput, out floor))
-                elevator = new Elevator(floor);
-            else
-            {
-                Console.WriteLine("That' doesn't make sense...");
-                Console.Beep();
-                Thread.Sleep(5000);
-                Console.Clear();
-                goto Start;
-            }
-            string input = string.Empty;
-
-            while (input != QUIT)
-            {
-                Console.WriteLine("Please press which floor you would like to go to");
-
-                input = Console.ReadLine();
-                if (Int32.TryParse(input, out floor))
-                    elevator.FloorPress(floor);
-                else if (input == QUIT)
-                    Console.WriteLine("GoodBye!");
-                else
-                    Console.WriteLine("You have pressed an incorrect floor, Please try again");
-            }
-        }
+        CreateHostBuilder(args).Build().Run();
     }
 
+    private static IHostBuilder CreateHostBuilder(string[] args) =>
+        Host.CreateDefaultBuilder(args)
+            .UseEnvironment("Development")
+            .ConfigureLogging(options => options.SetMinimumLevel(LogLevel.Information))
+            .ConfigureServices((_, services) => services.ConfigureServices());
 
-    public class Elevator
+    public static IServiceCollection ConfigureServices(this IServiceCollection services)
     {
-        //The building building may has x numbers of floors
-
-        private bool[] floorReady;
-        public int CurrentFloor = 0;
-        private int topfloor;
-        public State Status = State.STOPPED;
-
-        public Elevator(int NumberOfFloors = 5)
+        services.AddHttpClient("APIClient", opt =>
         {
-            floorReady = new bool[NumberOfFloors + 1];
-            topfloor = NumberOfFloors;
+            opt.BaseAddress = new Uri("https://localhost:7016/api/");
+            opt.DefaultRequestHeaders.Accept.Clear();
+            opt.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+        });
 
-        }
+        services.AddTransient<IApiService, ApiService>();
+        services.AddScoped<IElevatorService, ElevatorService>();
 
-        private void Stop(int floor)
-        {
-            Status = State.STOPPED;
-            CurrentFloor = floor;
-            floorReady[floor] = false;
-            Console.WriteLine("Stopped at floor {0}", floor);
-        }
-
-        //Button to close the doors
-        private void CloseDoors(int floor)
-        {
-            CurrentFloor = floor;
-            floorReady[floor] = false;
-
-        }
-
-        private void MovingDown(int floor)
-        {
-            for (int i = CurrentFloor; i >= 1; i--)
-            {
-                if (floorReady[i])
-                    Stop(floor);
-                else
-                    continue;
-            }
-
-            Status = State.STOPPED;
-            Console.WriteLine("Please Wait until the door is opened.");
-            Console.WriteLine("The door is Opened.");
-        }
-
-        private void MovingUp(int floor)
-        {
-            for (int i = CurrentFloor; i <= topfloor; i++)
-            {
-                if (floorReady[i])
-                    Stop(floor);
-                else
-                    continue;
-            }
-
-            Status = State.STOPPED;
-            Console.WriteLine("Please Wait until the door is opened.");
-            Console.WriteLine("The door is Opened.");
-        }
-
-        void StayPut()
-        {
-            Console.WriteLine("That's our current floor");
-        }
-
-        public void FloorPress(int floor)
-        {
-            if (floor > topfloor)
-            {
-                Console.WriteLine("We only have {0} floors", topfloor);
-                return;
-            }
-
-            floorReady[floor] = true;
-
-            switch (Status)
-            {
-
-                case State.DOWN:
-                    MovingDown(floor);
-                    break;
-
-                case State.STOPPED:
-                    if (CurrentFloor < floor)
-                        MovingUp(floor);
-                    else if (CurrentFloor == floor)
-                        StayPut();
-                    else
-                        MovingDown(floor);
-                    break;
-
-                case State.UP:
-                    MovingUp(floor);
-                    break;
-
-                default:
-                    break;
-            }
-
-
-        }
-
-        public enum State
-        {
-            UP,
-            STOPPED,
-            DOWN
-        }
+        services.AddHostedService<ElevatorWorker>();
+        return services;
     }
 }
