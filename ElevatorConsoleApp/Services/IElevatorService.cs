@@ -8,13 +8,14 @@ internal interface IElevatorService
 {
     public Task ConnectElevatorAsync();
     public Task InitializeElevatorAsync(string location, int numberOfFloors, string? id = null);
-    public Task DisconnectElevatorAsync();
 }
 
 internal class ElevatorService : IElevatorService
 {
     private readonly IApiService _apiService;
     private ElevatorResponse _elevator;
+    private bool _doorsIsOpen = false;
+
 
     public ElevatorService(IApiService apiService)
     {
@@ -36,22 +37,34 @@ internal class ElevatorService : IElevatorService
                        ?? throw new ArgumentNullException(nameof(ElevatorResponse));
 
         _elevator = elevator;
-
         var deviceClient = DeviceClient.CreateFromConnectionString(elevator.ConnectionString,
             options: new ClientOptions { SdkAssignsMessageId = SdkAssignsMessageId.WhenUnset },
             transportType: TransportType.Mqtt);
 
 
         await deviceClient.SetMethodHandlerAsync("CurrentCheck", TestMethodHandler, null);
+        await deviceClient.SetMethodHandlerAsync("ToggleDoors", ToggleDoorsMethodHandler, null);
 
         await ConnectElevatorAsync();
+    }
+
+    private Task<MethodResponse> ToggleDoorsMethodHandler(MethodRequest methodrequest, object usercontext)
+    {
+
+        _doorsIsOpen = !_doorsIsOpen;
+
+        Console.WriteLine($"ToggleDoor Command recieved for: {_elevator.Id}\nDoorOpen: {_doorsIsOpen}");
+
+        return Task.FromResult(new MethodResponse(Encoding.UTF8.GetBytes(""), 200));
     }
 
     private Task<MethodResponse> TestMethodHandler(MethodRequest methodrequest, object usercontext)
     {
         var data = Encoding.UTF8.GetString(methodrequest.Data);
         var result = "{\"result\":\"Invalid parameter\"}";
-        Console.WriteLine("FROM: " + _elevator.Id);
+
+        Console.WriteLine(_elevator.Id);
+
 
         if (!bool.TryParse(data, out var sendingState))
         {
@@ -69,15 +82,9 @@ internal class ElevatorService : IElevatorService
     {
         while (true)
         {
-            Console.WriteLine("from connectElevator");
+            Console.WriteLine($"Ping from: {_elevator.Id}");
             await Task.Delay(10000);
         }
-    }
-
-
-    public Task DisconnectElevatorAsync()
-    {
-        throw new NotImplementedException();
     }
 
 }
