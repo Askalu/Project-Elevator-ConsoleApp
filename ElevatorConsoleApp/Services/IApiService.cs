@@ -8,7 +8,9 @@ namespace ElevatorConsoleApp.Services;
 internal interface IApiService
 {
     public Task<ElevatorResponse?> RegisterElevatorAsync(ElevatorRequest request,
-        CancellationToken cancellationToken = new());
+        CancellationToken cancellationToken);
+
+    public Task<IEnumerable<ElevatorResponse>?> ImportElevatorsFromApiAsync(CancellationToken cancellationToken);
 }
 
 internal class ApiService : IApiService
@@ -20,8 +22,11 @@ internal class ApiService : IApiService
         _httpClientFactory = httpClientFactory;
     }
 
+
+
+
     public async Task<ElevatorResponse?> RegisterElevatorAsync(ElevatorRequest request,
-        CancellationToken cancellationToken = new())
+        CancellationToken cancellationToken)
     {
         try
         {
@@ -33,6 +38,9 @@ internal class ApiService : IApiService
             };
 
             Console.WriteLine($"Sending HTTP Request for elevator: {request.Location}");
+
+
+            await Task.Delay(1000, cancellationToken);
 
             var httpResponse = await client.SendAsync(httpRequest, cancellationToken);
 
@@ -48,6 +56,31 @@ internal class ApiService : IApiService
         catch
         {
             return null;
+        }
+    }
+
+    public async Task<IEnumerable<ElevatorResponse>?> ImportElevatorsFromApiAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            using var client = _httpClientFactory.CreateClient("APIClient");
+
+            var httpRequest = new HttpRequestMessage(HttpMethod.Get, "elevators/ids");
+
+            var httpResponse = await client.SendAsync(httpRequest, cancellationToken);
+
+            if (!httpResponse.IsSuccessStatusCode)
+                return Enumerable.Empty<ElevatorResponse>();
+
+            var response =
+                JsonConvert.DeserializeObject<HttpResponse<IEnumerable<ElevatorResponse>>>(
+                    await httpResponse.Content.ReadAsStringAsync(cancellationToken));
+
+            return response?.Data;
+        }
+        catch
+        {
+            return Enumerable.Empty<ElevatorResponse>();
         }
     }
 }

@@ -1,20 +1,21 @@
 ﻿using ElevatorConsoleApp.Models;
 using Microsoft.Azure.Devices.Client;
 using Microsoft.Azure.Devices.Shared;
-using System.Text;
+using Spectre.Console;
+
 
 namespace ElevatorConsoleApp.Services;
 internal interface IElevatorService
 {
-    public Task ConnectElevatorAsync();
-    public Task InitializeElevatorAsync(string location, int numberOfFloors, string? id = null);
+    public Task InitializeElevatorAsync(Elevator elevator, CancellationToken cancellationToken, string? id = null);
 }
 
 internal class ElevatorService : IElevatorService
 {
     private readonly IApiService _apiService;
-    private ElevatorResponse _elevator;
+    private Elevator _elevator;
     private bool _doorsIsOpen = false;
+
 
 
     public ElevatorService(IApiService apiService)
@@ -24,17 +25,27 @@ internal class ElevatorService : IElevatorService
 
 
 
-    public async Task InitializeElevatorAsync(string location, int numberOfFloors, string? id = null)
+    public async Task InitializeElevatorAsync(Elevator elevator, CancellationToken cancellationToken, string? id = null)
     {
-        if (string.IsNullOrWhiteSpace(location) || location.Length is > 200 or < 2 || numberOfFloors is < 2 or > 20)
-            throw new ArgumentNullException(nameof(location), nameof(numberOfFloors));
+        if (string.IsNullOrWhiteSpace(elevator.ConnectionString))
+        {
+            var response = await _apiService.RegisterElevatorAsync(new ElevatorRequest()
+            {
+                Id = elevator.ElevatorId,
+                Location = elevator.Location,
+                NumberOfFloors = elevator.NumberOfFloors
 
+            }, cancellationToken)
+                               ?? throw new ArgumentNullException(nameof(ElevatorResponse));
+            elevator.ElevatorId = response.Id;
+            elevator.Location = response.Location;
+            elevator.ConnectionString = response.ConnectionString;
+            elevator.NumberOfFloors = response.NumberOfFloors;
+        }
 
 
         //TODO Kolla om den finns i databas    
 
-        var elevator = await _apiService.RegisterElevatorAsync(new ElevatorRequest(location, numberOfFloors, id))
-                       ?? throw new ArgumentNullException(nameof(ElevatorResponse));
 
         _elevator = elevator;
         var deviceClient = DeviceClient.CreateFromConnectionString(elevator.ConnectionString,
@@ -42,48 +53,24 @@ internal class ElevatorService : IElevatorService
             transportType: TransportType.Mqtt);
 
 
-        await deviceClient.SetMethodHandlerAsync("CurrentCheck", TestMethodHandler, null);
-        await deviceClient.SetMethodHandlerAsync("ToggleDoors", ToggleDoorsMethodHandler, null);
 
-        await ConnectElevatorAsync();
+        await ConnectElevatorAsync(cancellationToken);
     }
 
-    private Task<MethodResponse> ToggleDoorsMethodHandler(MethodRequest methodrequest, object usercontext)
+
+    public async Task ConnectElevatorAsync(CancellationToken cancellationToken)
     {
-
-        _doorsIsOpen = !_doorsIsOpen;
-
-        Console.WriteLine($"ToggleDoor Command recieved for: {_elevator.Id}\nDoorOpen: {_doorsIsOpen}");
-
-        return Task.FromResult(new MethodResponse(Encoding.UTF8.GetBytes(""), 200));
-    }
-
-    private Task<MethodResponse> TestMethodHandler(MethodRequest methodrequest, object usercontext)
-    {
-        var data = Encoding.UTF8.GetString(methodrequest.Data);
-        var result = "{\"result\":\"Invalid parameter\"}";
-
-        Console.WriteLine(_elevator.Id);
-
-
-        if (!bool.TryParse(data, out var sendingState))
+        while (!cancellationToken.IsCancellationRequested)
         {
-            return Task.FromResult(new MethodResponse(Encoding.UTF8.GetBytes(result), 400));
-        }
+            var timer = new PeriodicTimer(TimeSpan.FromSeconds(5));
 
 
+            while (await timer.WaitForNextTickAsync(cancellationToken))
+            {
+                Console.WriteLine($"Ping from: {_elevator.Location} : {DateTime.Now}");
+            }
 
-        result = "{\"result\":\"Executed method\"}";
-        return Task.FromResult(new MethodResponse(Encoding.UTF8.GetBytes(result), 200));
-    }
-
-
-    public async Task ConnectElevatorAsync()
-    {
-        while (true)
-        {
-            Console.WriteLine($"Ping from: {_elevator.Id}");
-            await Task.Delay(10000);
+            await Task.Delay(10000, cancellationToken);
         }
     }
 

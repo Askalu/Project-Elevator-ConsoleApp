@@ -1,43 +1,84 @@
-﻿using ElevatorConsoleApp.Services;
-using Microsoft.Extensions.DependencyInjection;
+﻿using ElevatorConsoleApp.Helpers;
+using ElevatorConsoleApp.Pages;
+using ElevatorConsoleApp.Services;
 using Microsoft.Extensions.Hosting;
+using Spectre.Console;
+
 
 namespace ElevatorConsoleApp;
 
 internal class HostedService : BackgroundService
 {
-    private readonly IServiceProvider _serviceProvider;
     private readonly IHostApplicationLifetime _applicationLifetime;
+    private readonly IDatabaseService _databaseService;
+    private readonly GeneratePage _generatePage;
+    private readonly ImportApiPage _importApiPage;
+    private readonly ElevatorPage _elevatorPage;
 
-    public HostedService(IServiceProvider serviceProvider, IHostApplicationLifetime applicationLifetime)
+    public HostedService(
+        IServiceProvider serviceProvider,
+        IHostApplicationLifetime applicationLifetime,
+        IDatabaseService databaseService,
+        GeneratePage generatePage,
+        ImportApiPage importApiPage,
+        ElevatorPage elevatorPage)
     {
-        _serviceProvider = serviceProvider;
         _applicationLifetime = applicationLifetime;
+        _databaseService = databaseService;
+        _generatePage = generatePage;
+        _importApiPage = importApiPage;
+        _elevatorPage = elevatorPage;
     }
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        await DoWorkAsync(stoppingToken);
-    }
+        await _databaseService.BootstrapDatabaseAsync();
 
-    private async Task DoWorkAsync(CancellationToken stoppingToken)
-    {
-        await using var scope = _serviceProvider.CreateAsyncScope();
-
-        Task.Run(async () =>
+        while (!stoppingToken.IsCancellationRequested)
         {
-            var service = scope.ServiceProvider.GetService<IElevatorService>();
-            await service.InitializeElevatorAsync("test", 5, "f1f67b86-7d9e-4daf-fc83-08dace4026d0");
-        }, stoppingToken).ConfigureAwait(false);
+            AnsiConsole.Clear();
 
-        Task.Run(async () =>
-        {
-            var service = scope.ServiceProvider.GetService<IElevatorService>();
-            await service.InitializeElevatorAsync("test", 5, "3b491759-c60b-406b-fc86-08dace4026d0");
-        }, stoppingToken).ConfigureAwait(false);
+            var inp = AnsiConsole.Prompt(
+                new SelectionPrompt<string>()
+                    .Title("What would you like to do?")
+                    .PageSize(10)
+                    .Mode(SelectionMode.Independent)
+                    .AddChoices("Run Elevators", "List DB", "Import from API", "Generate Elevators", "Quit"));
 
-        while (true)
-        {
+            switch (inp.ToLower())
+            {
+                case "generate elevators":
+                    await _generatePage.DoWork(stoppingToken);
+                    break;
+                case "import from api":
+                    await _importApiPage.DoWork(stoppingToken);
+                    AnsiConsole.Write("Enter to continue...");
+                    Console.Read();
+                    break;
+                case "run elevators":
+                    await _elevatorPage.DoWork(stoppingToken);
+                    break;
+                case "list db":
+                    var elevators = await _databaseService.GetAllAsync();
+
+                    if (elevators is null)
+                    {
+                        AnsiConsole.WriteLine("DB is empty");
+                        AnsiConsole.Write("Enter to continue...");
+                        Console.Read();
+                        break;
+                    }
+
+                    AnsiConsole.Write(TableHelper.GenerateTable(elevators));
+                    AnsiConsole.Write("Enter to continue...");
+                    Console.Read();
+                    break;
+                case "quit":
+                    if (AnsiConsole.Confirm("Are you sure you want to quit?"))
+                        _applicationLifetime.StopApplication();
+                    break;
+                default:
+                    break;
+            }
         }
-
     }
 }
