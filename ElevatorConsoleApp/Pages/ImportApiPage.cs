@@ -39,7 +39,7 @@ internal class ImportApiPage : IPage
                             {
                                 await _databaseService.InsertAsync(new Elevator()
                                 {
-                                    ElevatorId = elevator.Id,
+                                    ElevatorId = elevator.ElevatorId,
                                     Location = elevator.Location,
                                     NumberOfFloors = elevator.NumberOfFloors
                                 });

@@ -8,16 +8,17 @@ internal static class TableHelper
     {
         var table = new Table();
 
+        table.AddColumn("Id");
         table.AddColumn("Floors");
         table.AddColumn("Address");
-        table.AddColumn("Id");
+        table.AddColumn("ElevatorId");
         table.AddColumn("ConnectionString");
 
         // ReSharper disable once PossibleMultipleEnumeration
 
         foreach (var elevator in elevators)
         {
-            table.AddRow(elevator.NumberOfFloors.ToString(), elevator.Location, elevator.ElevatorId ?? "NULL", elevator.ConnectionString ?? "NULL");
+            table.AddRow(elevator.Id.ToString(),elevator.NumberOfFloors.ToString(), elevator.Location, elevator.ElevatorId ?? "NULL", elevator.ConnectionString ?? "NULL");
         }
 
         return table;

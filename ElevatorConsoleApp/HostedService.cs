@@ -31,8 +31,6 @@ internal class HostedService : BackgroundService
     }
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        await _databaseService.BootstrapDatabaseAsync();
-
         while (!stoppingToken.IsCancellationRequested)
         {
             AnsiConsole.Clear();
@@ -42,7 +40,7 @@ internal class HostedService : BackgroundService
                     .Title("What would you like to do?")
                     .PageSize(10)
                     .Mode(SelectionMode.Independent)
-                    .AddChoices("Run Elevators", "List DB", "Import from API", "Generate Elevators", "Quit"));
+                    .AddChoices("Run Elevators", "List DB", "Delete DB", "Import from API","Generate Elevators", "Quit"));
 
             switch (inp.ToLower())
             {
@@ -71,6 +69,12 @@ internal class HostedService : BackgroundService
                     AnsiConsole.Write(TableHelper.GenerateTable(elevators));
                     AnsiConsole.Write("Enter to continue...");
                     Console.Read();
+                    break;
+                case "delete db":
+                    GC.WaitForPendingFinalizers();
+                    GC.Collect();
+                    await Task.Delay(1000, stoppingToken);
+                    File.Delete("database.sqlite");
                     break;
                 case "quit":
                     if (AnsiConsole.Confirm("Are you sure you want to quit?"))

@@ -1,11 +1,11 @@
 ﻿using System.Net.Http.Headers;
+using System.Reflection;
 using ElevatorConsoleApp;
 using ElevatorConsoleApp.Pages;
 using ElevatorConsoleApp.Services;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-
 
 using var host =
     Host.CreateDefaultBuilder(args)
@@ -25,6 +25,8 @@ using var host =
                 opt.DefaultRequestHeaders.Accept.Clear();
                 opt.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
             });
+
+            services.AddAutoMapper(Assembly.GetExecutingAssembly());
 
 
             // Services

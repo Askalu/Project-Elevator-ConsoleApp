@@ -1,10 +1,10 @@
-﻿using ElevatorConsoleApp.Models;
+﻿using AutoMapper;
+using ElevatorConsoleApp.Models;
 using Microsoft.Azure.Devices.Client;
 using Microsoft.Azure.Devices.Shared;
-using Spectre.Console;
-
 
 namespace ElevatorConsoleApp.Services;
+
 internal interface IElevatorService
 {
     public Task InitializeElevatorAsync(Elevator elevator, CancellationToken cancellationToken, string? id = null);
@@ -13,65 +13,54 @@ internal interface IElevatorService
 internal class ElevatorService : IElevatorService
 {
     private readonly IApiService _apiService;
-    private Elevator _elevator;
-    private bool _doorsIsOpen = false;
+    private readonly IDatabaseService _databaseService;
+    private readonly IMapper _mapper;
+    private Elevator? _elevator;
+    private DeviceClient? _deviceClient;
 
 
-
-    public ElevatorService(IApiService apiService)
+    public ElevatorService(IApiService apiService, IDatabaseService databaseService, IMapper mapper)
     {
         _apiService = apiService;
+        _databaseService = databaseService;
+        _mapper = mapper;
     }
-
 
 
     public async Task InitializeElevatorAsync(Elevator elevator, CancellationToken cancellationToken, string? id = null)
     {
         if (string.IsNullOrWhiteSpace(elevator.ConnectionString))
         {
-            var response = await _apiService.RegisterElevatorAsync(new ElevatorRequest()
-            {
-                Id = elevator.ElevatorId,
-                Location = elevator.Location,
-                NumberOfFloors = elevator.NumberOfFloors
+            var response =
+                await _apiService.RegisterElevatorAsync(_mapper.Map<ElevatorRequest>(elevator), cancellationToken)
+                ?? throw new ArgumentException(nameof(ElevatorResponse));
 
-            }, cancellationToken)
-                               ?? throw new ArgumentNullException(nameof(ElevatorResponse));
-            elevator.ElevatorId = response.Id;
-            elevator.Location = response.Location;
-            elevator.ConnectionString = response.ConnectionString;
-            elevator.NumberOfFloors = response.NumberOfFloors;
+            elevator = _mapper.Map(response, elevator);
+
+            await _databaseService.Update(elevator);
         }
 
-
-        //TODO Kolla om den finns i databas    
-
-
         _elevator = elevator;
-        var deviceClient = DeviceClient.CreateFromConnectionString(elevator.ConnectionString,
+        _deviceClient = DeviceClient.CreateFromConnectionString(elevator.ConnectionString,
             options: new ClientOptions { SdkAssignsMessageId = SdkAssignsMessageId.WhenUnset },
             transportType: TransportType.Mqtt);
-
 
 
         await ConnectElevatorAsync(cancellationToken);
     }
 
 
-    public async Task ConnectElevatorAsync(CancellationToken cancellationToken)
+    private async Task ConnectElevatorAsync(CancellationToken cancellationToken)
     {
         while (!cancellationToken.IsCancellationRequested)
         {
-            var timer = new PeriodicTimer(TimeSpan.FromSeconds(5));
-
+            var timer = new PeriodicTimer(TimeSpan.FromMinutes(1));
 
             while (await timer.WaitForNextTickAsync(cancellationToken))
             {
-                Console.WriteLine($"Ping from: {_elevator.Location} : {DateTime.Now}");
-            }
 
-            await Task.Delay(10000, cancellationToken);
+                Console.WriteLine($"Ping from: {_elevator?.Location} : {DateTime.Now}");
+            }
         }
     }
-
 }
