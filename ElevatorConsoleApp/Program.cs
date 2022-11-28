@@ -17,11 +17,11 @@ using var host =
             options.AddFilter("System", LogLevel.Error);
             options.AddFilter("Engine", LogLevel.Warning);
         })
-        .ConfigureServices(services =>
+        .ConfigureServices((context,services) =>
         {
             services.AddHttpClient("APIClient", opt =>
             {
-                opt.BaseAddress = new Uri("https://localhost:7016/api/");
+                opt.BaseAddress = new Uri(context.Configuration["ApiURL"] ?? throw new ArgumentException());
                 opt.DefaultRequestHeaders.Accept.Clear();
                 opt.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
             });

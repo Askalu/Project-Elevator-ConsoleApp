@@ -18,7 +18,7 @@ internal static class TableHelper
 
         foreach (var elevator in elevators)
         {
-            table.AddRow(elevator.Id.ToString(),elevator.NumberOfFloors.ToString(), elevator.Location, elevator.ElevatorId ?? "NULL", elevator.ConnectionString ?? "NULL");
+            table.AddRow(elevator.Id.ToString(),elevator.NumberOfFloors.ToString(), elevator.Location, elevator.ElevatorId ?? "NULL", string.IsNullOrWhiteSpace(elevator.ConnectionString) ? "No" : "Yes");
         }
 
         return table;
